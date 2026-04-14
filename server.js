@@ -301,12 +301,16 @@ app.post('/scan', async (req, res) => {
                 success = false; // Explicitly set to false if a failure message is found
                 console.log(`Scan ${scanId}: Login failed due to explicit failure message.`);
             } else {
+                // Ensure the page is fully loaded before checking for login fields
+                await page.waitForLoadState('domcontentloaded');
+
                 // Check if the login fields (username/email and password) are still present
                 // If they are not present, it indicates a successful login/redirection away from the login form.
-                const usernameFieldPresent = await page.waitForSelector('input[name="username"], input[name="email"], input[name="phone"]', { timeout: 5000 }).then(() => true).catch(() => false);
-                const passwordFieldPresent = await page.waitForSelector('input[name="password"]', { timeout: 5000 }).then(() => true).catch(() => false);
+                const usernameFieldCount = await page.locator('input[name="username"], input[name="email"], input[name="phone"]').count();
+                const passwordFieldCount = await page.locator('input[name="password"]').count();
+                const submitButtonCount = await page.locator('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In")').count();
 
-                const loginFieldsStillPresent = usernameFieldPresent || passwordFieldPresent; // If either is present, the form is still there
+                const loginFieldsStillPresent = (usernameFieldCount > 0 || passwordFieldCount > 0 || submitButtonCount > 0);
 
                 if (!loginFieldsStillPresent) {
                     success = true;
