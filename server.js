@@ -265,26 +265,59 @@ app.post('/scan', async (req, res) => {
             let success = false;
             let successfulLogin = null; // Initialize a variable to store the first successful login
 
-            // Check for common indicators of a successful login
-            const myAccountLinkPresent = await page.locator('#flyout a:has-text("My Account")').isVisible();
-            const welcomeMessagePresent = await page.locator('text=Welcome,').isVisible();
+            // Define common failure message selectors
+            const failureMessageSelectors = [
+                'text=Invalid credentials',
+                'text=Incorrect username or password',
+                'text=Login failed',
+                'text=Authentication failed',
+                'text=Access denied',
+                'text=Wrong username or password',
+                'div.error-message', // Common class for error messages
+                'span.error',        // Another common class for error messages
+                '#login-error',      // Common ID for login error messages
+                '#message.error'     // Another common ID for error messages
+            ];
 
-            if (myAccountLinkPresent || welcomeMessagePresent) {
-                success = true;
-                successfulLogin = { username: finalUsername, password: passwordPayload.trim() }; // Store successful credentials
-                console.log('Login successful: "My Account" link or "Welcome" message found.');
-
-                // Store successful login in MongoDB
+            let failureMessageFound = false;
+            for (const selector of failureMessageSelectors) {
                 try {
-                    const database = client.db("injection"); // Specify your database name
-                    const collection = database.collection("successfulLogins");
-                    await collection.insertOne(successfulLogin);
-                    console.log("Successful login stored in MongoDB:", successfulLogin);
-                } catch (dbError) {
-                    console.error("Error storing successful login in MongoDB:", dbError);
+                    const locator = page.locator(selector);
+                    if (await locator.isVisible()) {
+                        console.log(`Login failed: Found failure message with selector: "${selector}"`);
+                        failureMessageFound = true;
+                        break;
+                    }
+                } catch (e) {
+                    // Selector not found, continue to next
                 }
+            }
+
+            if (failureMessageFound) {
+                success = false; // Explicitly set to false if a failure message is found
+                console.log('Login failed due to explicit failure message.');
             } else {
-                console.log('Login failed: No clear success indicators found (e.g., "My Account" link or "Welcome" message).');
+                // Check for common indicators of a successful login only if no failure message was found
+                const myAccountLinkPresent = await page.locator('#flyout a:has-text("My Account")').isVisible();
+                const welcomeMessagePresent = await page.locator('text=Welcome,').isVisible();
+
+                if (myAccountLinkPresent || welcomeMessagePresent) {
+                    success = true;
+                    successfulLogin = { username: finalUsername, password: passwordPayload.trim() }; // Store successful credentials
+                    console.log('Login successful: "My Account" link or "Welcome" message found.');
+
+                    // Store successful login in MongoDB
+                    try {
+                        const database = client.db("injection"); // Specify your database name
+                        const collection = database.collection("successfulLogins");
+                        await collection.insertOne(successfulLogin);
+                        console.log("Successful login stored in MongoDB:", successfulLogin);
+                    } catch (dbError) {
+                        console.error("Error storing successful login in MongoDB:", dbError);
+                    }
+                } else {
+                    console.log('Login failed: No clear success indicators found (e.g., "My Account" link or "Welcome" message).');
+                }
             }
             results.push({ payload: { username: usernamePayload.trim(), password: passwordPayload.trim() }, success });
             await page.goto(targetUrl, { timeout: 60000, waitUntil: 'domcontentloaded' }); // Go back to the login page for the next payload

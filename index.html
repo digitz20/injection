@@ -94,9 +94,11 @@
                 <option value="nosql">NoSQL Injection</option>
             </select>
         </div>
-        <button onclick="startScan()">Start Scan</button>
+        <button id="startScanButton" onclick="startScan()">Start Scan</button>
+        <button id="stopScanButton" onclick="stopScan()" disabled style="background-color: #dc3545;">Stop Scan</button>
 
         <div class="loading" id="loading" style="display: none;">Scanning... Please wait.</div>
+        <div class="status-message" id="statusMessage" style="margin-top: 10px; text-align: center; color: #007bff;"></div>
 
         <div class="results" id="results">
             <h2>Scan Results:</h2>
@@ -110,7 +112,15 @@
     </div>
 
     <script>
+        let abortController;
+        let isScanning = false;
+
         async function startScan() {
+            if (isScanning) {
+                console.log("Scan already in progress.");
+                return;
+            }
+
             const url = document.getElementById('url').value;
             const type = document.getElementById('type').value;
             const resultsDiv = document.getElementById('results');
@@ -119,10 +129,21 @@
             const successfulLoginDisplay = document.getElementById('successfulLoginDisplay');
             const successfulUsernameSpan = document.getElementById('successfulUsername');
             const successfulPasswordSpan = document.getElementById('successfulPassword');
+            const startScanButton = document.getElementById('startScanButton');
+            const stopScanButton = document.getElementById('stopScanButton');
+            const statusMessageDiv = document.getElementById('statusMessage');
 
             resultsDiv.innerHTML = '<h2>Scan Results:</h2>'; // Clear previous results
             successfulLoginDisplay.style.display = 'none'; // Hide successful login display initially
+            statusMessageDiv.textContent = ''; // Clear any previous status messages
+
+            isScanning = true;
+            startScanButton.disabled = true;
+            stopScanButton.disabled = false;
             loadingDiv.style.display = 'block'; // Show loading message
+
+            abortController = new AbortController();
+            const signal = abortController.signal;
 
             try {
                 const response = await fetch('https://injection-lhpe.onrender.com/scan', {
@@ -130,25 +151,25 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ url, type, email })
+                    body: JSON.stringify({ url, type, email }),
+                    signal: signal // Pass the abort signal to the fetch request
                 });
 
                 const data = await response.json();
-                console.log('Data received from backend:', data); // Added for debugging
-                console.log('Successful login data from backend:', data.successfulLogin); // New log for successfulLogin
+                console.log('Data received from backend:', data);
+                console.log('Successful login data from backend:', data.successfulLogin);
 
                 loadingDiv.style.display = 'none'; // Hide loading message
 
                 if (response.ok) {
-                    // Display successful login if found
                     if (data.successfulLogin) {
-                        console.log('Attempting to display successful login.'); // New log
+                        console.log('Attempting to display successful login.');
                         successfulUsernameSpan.textContent = data.successfulLogin.username;
                         successfulPasswordSpan.textContent = data.successfulLogin.password;
                         successfulLoginDisplay.style.display = 'block';
                     }
 
-                    data.results.forEach(item => { // Access data.results
+                    data.results.forEach(item => {
                         const resultItem = document.createElement('div');
                         resultItem.classList.add('result-item');
                         resultItem.classList.add(item.success ? 'success' : 'failure');
@@ -166,8 +187,25 @@
 
             } catch (error) {
                 loadingDiv.style.display = 'none'; // Hide loading message
-                resultsDiv.innerHTML += `<p style="color: red;">An unexpected error occurred: ${error.message}</p>`;
-                console.error('Fetch error:', error);
+                if (error.name === 'AbortError') {
+                    statusMessageDiv.textContent = 'Scan stopped by user.';
+                    console.log('Fetch aborted by user.');
+                } else {
+                    resultsDiv.innerHTML += `<p style="color: red;">An unexpected error occurred: ${error.message}</p>`;
+                    console.error('Fetch error:', error);
+                }
+            } finally {
+                isScanning = false;
+                startScanButton.disabled = false;
+                stopScanButton.disabled = true;
+            }
+        }
+
+        function stopScan() {
+            if (isScanning && abortController) {
+                abortController.abort();
+                console.log("Attempting to abort fetch request.");
+                // The finally block in startScan will handle resetting UI elements
             }
         }
     </script>
