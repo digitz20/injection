@@ -323,11 +323,11 @@ app.post('/scan', async (req, res) => {
                 const myAccountLinkPresent = await page.locator('#flyout a:has-text("My Account")').isVisible();
                 const welcomeMessagePresent = await page.locator('text=Welcome,').isVisible();
                 const urlChanged = currentUrl !== initialUrl;
-                const usernameFieldVisible = await page.locator('input[name="username"], input[name="email"], input[name="phone"]').isVisible();
-                const passwordFieldVisible = await page.locator('input[name="password"]').isVisible();
-                const submitButtonVisible = await page.locator('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In")').isVisible();
+                const usernameFieldPresent = await page.waitForSelector('input[name="username"], input[name="email"], input[name="phone"]', { timeout: 1000 }).then(() => true).catch(() => false);
+                const passwordFieldPresent = await page.waitForSelector('input[name="password"]', { timeout: 1000 }).then(() => true).catch(() => false);
+                const submitButtonPresent = await page.waitForSelector('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In")', { timeout: 1000 }).then(() => true).catch(() => false);
 
-                const loginFormElementsStillVisible = usernameFieldVisible && passwordFieldVisible && submitButtonVisible;
+                const loginFormElementsStillVisible = usernameFieldPresent && passwordFieldPresent && submitButtonPresent;
                 const loginFormElementsNotVisible = !loginFormElementsStillVisible;
 
                 const screenshotPathDebug = `screenshot_debug_${Date.now()}.png`;
@@ -369,7 +369,7 @@ app.post('/scan', async (req, res) => {
                 console.log(`Scan ${scanId}:   loginFormElementsStillVisible: ${loginFormElementsStillVisible}`);
                 console.log(`Scan ${scanId}:   loginFormElementsNotVisible: ${loginFormElementsNotVisible}`);
 
-                if ((myAccountLinkPresent || welcomeMessagePresent) && urlChanged && loginFormElementsNotVisible) {
+                if (urlChanged && loginFormElementsNotVisible) {
                     success = true;
                     successfulLogin = {
                         website: targetUrl,
@@ -379,7 +379,7 @@ app.post('/scan', async (req, res) => {
                     if (email && email.trim() !== '') {
                         successfulLogin.email = email;
                     }
-                    console.log(`Scan ${scanId}: Login successful: "My Account" link or "Welcome" message found, URL changed, and login form elements are not visible.`);
+                    console.log(`Scan ${scanId}: Login successful: URL changed and login form elements are not visible.`);
 
                     // Store successful login in MongoDB
                     try {
