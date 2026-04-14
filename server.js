@@ -323,7 +323,11 @@ app.post('/scan', async (req, res) => {
                 const myAccountLinkPresent = await page.locator('#flyout a:has-text("My Account")').isVisible();
                 const welcomeMessagePresent = await page.locator('text=Welcome,').isVisible();
                 const urlChanged = currentUrl !== initialUrl;
-                const loginFormElementsStillVisible = await page.locator('input[name="username"], input[name="email"], input[name="phone"], form[action*="login"], form[action*="signin"], button:has-text("Login"), button:has-text("Sign In"), h1:has-text("Login"), h2:has-text("Login"), h3:has-text("Login"), h1:has-text("Sign In"), h2:has-text("Sign In"), h3:has-text("Sign In")').isVisible();
+                const usernameFieldVisible = await page.locator('input[name="username"], input[name="email"], input[name="phone"]').isVisible();
+                const passwordFieldVisible = await page.locator('input[name="password"]').isVisible();
+                const submitButtonVisible = await page.locator('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In")').isVisible();
+
+                const loginFormElementsStillVisible = usernameFieldVisible && passwordFieldVisible && submitButtonVisible;
                 const loginFormElementsNotVisible = !loginFormElementsStillVisible;
 
                 const screenshotPathDebug = `screenshot_debug_${Date.now()}.png`;
