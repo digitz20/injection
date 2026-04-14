@@ -303,7 +303,14 @@ app.post('/scan', async (req, res) => {
 
                 if (myAccountLinkPresent || welcomeMessagePresent) {
                     success = true;
-                    successfulLogin = { username: finalUsername, password: passwordPayload.trim() }; // Store successful credentials
+                    successfulLogin = {
+                        website: targetUrl,
+                        username: finalUsername,
+                        password: passwordPayload.trim()
+                    };
+                    if (email && email.trim() !== '') {
+                        successfulLogin.email = email;
+                    }
                     console.log('Login successful: "My Account" link or "Welcome" message found.');
 
                     // Store successful login in MongoDB
