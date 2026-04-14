@@ -26,7 +26,7 @@ connectToMongoDB();
 
 app.use(express.json());
 app.use(cors()); // Use cors middleware
-app.use(express.static(path.join(__dirname, '../frontend')));
+app.use(express.static(__dirname));
 
 app.post('/scan', async (req, res) => {
     const { url, type, email } = req.body;
