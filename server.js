@@ -345,6 +345,19 @@ app.post('/scan', async (req, res) => {
                 });
                 console.log(`Scan ${scanId}: Page content snippet (first 2000 chars or login form): ${pageContentSnippet}`);
 
+                const frames = page.frames();
+                if (frames.length > 1) {
+                    console.log(`Scan ${scanId}: Found ${frames.length - 1} iframes on the page.`);
+                    for (let i = 1; i < frames.length; i++) {
+                        console.log(`Scan ${scanId}:   Iframe URL: ${frames[i].url()}`);
+                        // Optionally, you could try to get content from the iframe here
+                        // const iframeContent = await frames[i].content();
+                        // console.log(`Scan ${scanId}:   Iframe content snippet (first 500 chars): ${iframeContent.substring(0, 500)}`);
+                    }
+                } else {
+                    console.log(`Scan ${scanId}: No iframes found on the page.`);
+                }
+
                 console.log(`Scan ${scanId}: Debugging login success conditions:`);
                 console.log(`Scan ${scanId}:   myAccountLinkPresent: ${myAccountLinkPresent}`);
                 console.log(`Scan ${scanId}:   welcomeMessagePresent: ${welcomeMessagePresent}`);
