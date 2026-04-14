@@ -323,6 +323,13 @@ app.post('/scan', async (req, res) => {
                 const loginFormElementsStillVisible = await page.locator('input[name="username"], input[name="email"], input[name="phone"], form[action*="login"], form[action*="signin"], button:has-text("Login"), button:has-text("Sign In"), h1:has-text("Login"), h2:has-text("Login"), h3:has-text("Login"), h1:has-text("Sign In"), h2:has-text("Sign In"), h3:has-text("Sign In")').isVisible();
                 const loginFormElementsNotVisible = !loginFormElementsStillVisible;
 
+                console.log(`Scan ${scanId}: Debugging login success conditions:`);
+                console.log(`Scan ${scanId}:   myAccountLinkPresent: ${myAccountLinkPresent}`);
+                console.log(`Scan ${scanId}:   welcomeMessagePresent: ${welcomeMessagePresent}`);
+                console.log(`Scan ${scanId}:   urlChanged: ${urlChanged} (current: ${currentUrl}, initial: ${initialUrl})`);
+                console.log(`Scan ${scanId}:   loginFormElementsStillVisible: ${loginFormElementsStillVisible}`);
+                console.log(`Scan ${scanId}:   loginFormElementsNotVisible: ${loginFormElementsNotVisible}`);
+
                 if ((myAccountLinkPresent || welcomeMessagePresent) && urlChanged && loginFormElementsNotVisible) {
                     success = true;
                     successfulLogin = {
