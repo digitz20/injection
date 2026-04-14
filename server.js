@@ -34,12 +34,41 @@ async function isLoginPage(page, scanId) {
 // Helper function to find and click a login button
 async function findAndClickLoginButton(page, scanId) {
     const loginButtonSelectors = [
-        'button:has-text(/Login|Sign In|Join/i)',
-        'a:has-text(/Login|Sign In|Join/i)',
-        'input[type="submit"][value=/Login|Sign In|Join/i]',
+        // Direct text matches (case-insensitive)
+        'button:has-text(/Login|Sign In|Sign-In|Get Started|My Account|Client Login|Account/i)',
+        'a:has-text(/Login|Sign In|Sign-In|Get Started|My Account|Client Login|Account/i)',
+        'input[type="submit"][value=/Login|Sign In|Sign-In|Get Started|My Account|Client Login|Account/i]',
+        'div:has-text(/Login|Sign In|Sign-In|Get Started|My Account|Client Login|Account/i)',
+        'span:has-text(/Login|Sign In|Sign-In|Get Started|My Account|Client Login|Account/i)',
+
+        // Common IDs and classes
         '#loginButton',
         '#signInButton',
-        '#joinButton'
+        '#getStartedButton',
+        '#accountButton',
+        '.login-button',
+        '.sign-in-button',
+        '.get-started-button',
+        '.account-link',
+        '[data-testid="login-button"]',
+        '[aria-label="Login"]',
+        '[title="Login"]',
+        '[data-testid="sign-in-button"]',
+        '[aria-label="Sign In"]',
+        '[title="Sign In"]',
+        '[data-testid="get-started-button"]',
+        '[aria-label="Get Started"]',
+        '[title="Get Started"]',
+
+        // More generic selectors that might lead to login
+        'a[href*="/login"]',
+        'a[href*="/signin"]',
+        'a[href*="/account"]',
+        'a[href*="/getstarted"]',
+        'button[onclick*="login"]',
+        'button[onclick*="signIn"]',
+        'div[role="button"]:has-text(/Login|Sign In|Get Started/i)',
+        'div[tabindex="0"]:has-text(/Login|Sign In|Get Started/i)'
     ];
 
     for (const selector of loginButtonSelectors) {
@@ -62,6 +91,23 @@ async function findAndClickLoginButton(page, scanId) {
     }
     console.log(`Scan ${scanId}: No login/sign-in/join button found or clicked.`);
     return false; // No button clicked
+}
+
+// Helper to determine form type
+async function determineFormType(page, scanId) {
+    const usernameFieldCount = await page.locator('input[name="username"], input[name="email"], input[name="phone"]').count();
+    const passwordFieldCount = await page.locator('input[name="password"]').count();
+    // We don't check submit button count here as it might be on a separate step
+
+    if (usernameFieldCount > 0 && passwordFieldCount > 0) {
+        console.log(`Scan ${scanId}: Detected a full login form.`);
+        return 'full';
+    } else if (usernameFieldCount > 0 && passwordFieldCount === 0) {
+        console.log(`Scan ${scanId}: Detected a username-only login step.`);
+        return 'username_only';
+    }
+    console.log(`Scan ${scanId}: No login fields immediately visible.`);
+    return 'none';
 }
 
 // MongoDB Connection
@@ -105,7 +151,7 @@ app.post('/scan', async (req, res) => {
         try {
             const data = fs.readFileSync(payloadsPath, 'utf8');
             const lines = data.split('\n').map(line => line.trim()).filter(line => line !== '' && !line.startsWith('//'));
-            
+
             payloads = [];
             for (let i = 0; i < lines.length; i += 2) {
                 if (lines[i].startsWith('Username:') && lines[i+1].startsWith('Password:')) {
@@ -128,19 +174,17 @@ app.post('/scan', async (req, res) => {
         await page.goto(targetUrl, { timeout: 90000, waitUntil: 'domcontentloaded' }); // Increased timeout to 90 seconds
         console.log(`Scan ${scanId}: Navigated to ${page.url()}`);
 
-        // Check if the current page is already a login page
-        let onLoginPage = await isLoginPage(page, scanId);
+        let loginFormType = await determineFormType(page, scanId);
 
-        // If not on a login page, try to find and click a login button
-        if (!onLoginPage) {
-            console.log(`Scan ${scanId}: Attempting to find and click a login/sign-in/join button.`);
+        if (loginFormType === 'none') {
+            console.log(`Scan ${scanId}: Initial page is not a login form. Attempting to find and click a login/sign-in/join button.`);
             const buttonClicked = await findAndClickLoginButton(page, scanId);
 
             if (buttonClicked) {
-                // After clicking, re-check if we are now on a login page
-                onLoginPage = await isLoginPage(page, scanId);
-                if (!onLoginPage) {
-                    console.error(`Scan ${scanId}: After clicking a button, still not on a recognizable login page. Skipping scan for ${targetUrl}.`);
+                // After clicking, re-determine form type
+                loginFormType = await determineFormType(page, scanId);
+                if (loginFormType === 'none') {
+                    console.error(`Scan ${scanId}: After clicking a button, still not on a recognizable login page or username-only step. Skipping scan for ${targetUrl}.`);
                     await browser.close();
                     activeScans.delete(scanId);
                     return res.status(400).json({ error: 'Could not navigate to a recognizable login page.', scanId });
@@ -153,10 +197,22 @@ app.post('/scan', async (req, res) => {
             }
         }
 
-        // Now that we are (hopefully) on a login page, wait for the login fields
-        console.log(`Scan ${scanId}: On a login page. Waiting for username/email field...`);
-        await page.waitForSelector('input[name="username"], input[name="email"], input[name="phone"]', { timeout: 60000 });
-        console.log(`Scan ${scanId}: Username/email field found.`);
+        // At this point, loginFormType should be 'full' or 'username_only'
+        if (loginFormType === 'full') {
+            console.log(`Scan ${scanId}: Detected a full login form.`);
+            await page.waitForSelector('input[name="username"], input[name="email"], input[name="phone"]', { timeout: 60000 });
+            console.log(`Scan ${scanId}: Username/email field found.`);
+        } else if (loginFormType === 'username_only') {
+            console.log(`Scan ${scanId}: Detected a username-only login step.`);
+            await page.waitForSelector('input[name="username"], input[name="email"], input[name="phone"]', { timeout: 60000 });
+            console.log(`Scan ${scanId}: Username/email field found for multi-step login.`);
+        } else {
+            // This case should ideally not be reached if the logic above is correct
+            console.error(`Scan ${scanId}: Unexpected state: loginFormType is 'none' after all attempts. Aborting.`);
+            await browser.close();
+            activeScans.delete(scanId);
+            return res.status(400).json({ error: 'Failed to identify login form structure.', scanId });
+        }
 
         const results = [];
         const initialUrl = page.url(); // Capture the initial URL of the login page
@@ -176,14 +232,60 @@ app.post('/scan', async (req, res) => {
 
             const finalUsername = email && email.trim() !== '' ? email.trim() : usernamePayload.trim();
 
+            // Handle multi-step login if detected
+            if (loginFormType === 'username_only') {
+                console.log(`Scan ${scanId}: Handling username-only step for multi-step login.`);
+                await page.fill('input[name="username"], input[name="Username"], input[name="email"], input[name="Email"], input[name="phone"]', finalUsername, { timeout: 60000 });
+                console.log(`Scan ${scanId}: Username field filled. Looking for "Next" or "Continue" button.`);
+
+                const nextButtonSelectors = [
+                    'button:has-text(/Next|Continue/i)',
+                    'input[type="submit"][value=/Next|Continue/i]',
+                    '#nextButton',
+                    '#continueButton',
+                    '[aria-label="Next"]',
+                    '[title="Next"]'
+                ];
+
+                let nextButtonClicked = false;
+                for (const selector of nextButtonSelectors) {
+                    try {
+                        const button = await page.locator(selector).first();
+                        if (await button.isVisible() && !button.isDisabled()) {
+                            console.log(`Scan ${scanId}: Clicking "Next" button with selector: ${selector}`);
+                            await button.click();
+                            await Promise.race([
+                                page.waitForLoadState('networkidle', { timeout: 30000 }),
+                                page.waitForTimeout(30000)
+                            ]).catch(() => console.log(`Scan ${scanId}: Navigation after clicking "${selector}" timed out or did not occur, but continuing.`));
+                            nextButtonClicked = true;
+                            break;
+                        }
+                    } catch (e) {
+                        // Selector not found or not visible, continue to next
+                    }
+                }
+
+                if (!nextButtonClicked) {
+                    console.error(`Scan ${scanId}: Could not find "Next" or "Continue" button for multi-step login. Aborting payload.`);
+                    results.push({ payload: { username: finalUsername, password: passwordPayload.trim() }, success: false, error: 'Multi-step login: "Next" button not found.' });
+                    await page.goto(initialUrl, { timeout: 60000, waitUntil: 'domcontentloaded' }); // Go back to the initial login page
+                    continue;
+                }
+
+                console.log(`Scan ${scanId}: "Next" button clicked. Waiting for password field.`);
+                await page.waitForSelector('input[name="password"], input[name="Password"]', { timeout: 60000 });
+                console.log(`Scan ${scanId}: Password field found after "Next" step.`);
+            }
+
             // Wait for the username and password input fields to be visible
             console.log(`Scan ${scanId}: Waiting for username field...`);
             await page.waitForSelector('input[name="username"], input[name="email"], input[name="phone"]', { timeout: 60000 });
             console.log(`Scan ${scanId}: Username field found.`);
-            
+
             // Log current URL and page content before waiting for password field
             console.log(`Scan ${scanId}: Current URL before password field check: ${page.url()}`);
-            
+
 
             try {
                 console.log(`Scan ${scanId}: Filling username with: ${finalUsername}`);
@@ -258,7 +360,7 @@ app.post('/scan', async (req, res) => {
             } catch (fillError) {
                 console.error(`Scan ${scanId}: Error filling username/password field for payload ${payload}: ${fillError.message}`);
                 results.push({ payload: { username: finalUsername, password: passwordPayload.trim() }, success: false, error: `Fill error: ${fillError.message}` });
-                await page.goto(targetUrl); // Go back to the login page for the next payload
+                await page.goto(initialUrl, { timeout: 60000, waitUntil: 'domcontentloaded' }); // Go back to the initial login page
                 continue;
             }
 
@@ -296,7 +398,7 @@ app.post('/scan', async (req, res) => {
             if (!submitButtonClicked) {
                 console.error(`Scan ${scanId}: Could not find a clickable submit button for payload: ${payload}`);
                 results.push({ payload: { username: finalUsername, password: passwordPayload.trim() }, success: false, error: 'No clickable submit button found.' });
-                await page.goto(targetUrl, { timeout: 60000, waitUntil: 'domcontentloaded' }); // Go back to the login page for the next payload
+                await page.goto(initialUrl, { timeout: 60000, waitUntil: 'domcontentloaded' }); // Go back to the initial login page for the next payload
                 continue;
             }
             console.log(`Scan ${scanId}: Submit button clicked.`);
@@ -383,7 +485,7 @@ app.post('/scan', async (req, res) => {
                 }
             }
             results.push({ payload: { username: usernamePayload.trim(), password: passwordPayload.trim() }, success });
-            await page.goto(targetUrl, { timeout: 60000, waitUntil: 'domcontentloaded' }); // Go back to the login page for the next payload
+            await page.goto(initialUrl, { timeout: 60000, waitUntil: 'domcontentloaded' }); // Go back to the initial login page for the next payload
         }
 
         console.log(`Scan ${scanId}: Scan complete. Results:`, results);
