@@ -16,6 +16,54 @@ function uuidv4() {
     return crypto.randomBytes(16).toString('hex');
 }
 
+// Helper function to check if the current page appears to be a login page
+async function isLoginPage(page, scanId) {
+    const usernameFieldCount = await page.locator('input[name="username"], input[name="email"], input[name="phone"]').count();
+    const passwordFieldCount = await page.locator('input[name="password"]').count();
+    const submitButtonCount = await page.locator('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In")').count();
+
+    const isLogin = (usernameFieldCount > 0 && passwordFieldCount > 0) || submitButtonCount > 0;
+    if (isLogin) {
+        console.log(`Scan ${scanId}: Page appears to be a login page.`);
+    } else {
+        console.log(`Scan ${scanId}: Page does not immediately appear to be a login page.`);
+    }
+    return isLogin;
+}
+
+// Helper function to find and click a login button
+async function findAndClickLoginButton(page, scanId) {
+    const loginButtonSelectors = [
+        'button:has-text(/Login|Sign In|Join/i)',
+        'a:has-text(/Login|Sign In|Join/i)',
+        'input[type="submit"][value=/Login|Sign In|Join/i]',
+        '#loginButton',
+        '#signInButton',
+        '#joinButton'
+    ];
+
+    for (const selector of loginButtonSelectors) {
+        try {
+            const button = await page.locator(selector).first();
+            if (await button.isVisible() && !button.isDisabled()) {
+                console.log(`Scan ${scanId}: Clicking login/sign-in/join button with selector: ${selector}`);
+                await button.click();
+                // Use Promise.race to handle cases where navigation might not occur or takes too long
+                await Promise.race([
+                    page.waitForLoadState('networkidle', { timeout: 30000 }),
+                    page.waitForTimeout(30000) // Max wait for navigation
+                ]).catch(() => console.log(`Scan ${scanId}: Navigation after clicking "${selector}" timed out or did not occur, but continuing.`));
+                console.log(`Scan ${scanId}: Navigated to ${page.url()} after clicking button.`);
+                return true; // Button clicked and navigation attempted
+            }
+        } catch (e) {
+            // Selector not found or not visible, continue to next
+        }
+    }
+    console.log(`Scan ${scanId}: No login/sign-in/join button found or clicked.`);
+    return false; // No button clicked
+}
+
 // MongoDB Connection
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri);
@@ -79,39 +127,36 @@ app.post('/scan', async (req, res) => {
         console.log(`Scan ${scanId}: Navigating to ${targetUrl}`);
         await page.goto(targetUrl, { timeout: 90000, waitUntil: 'domcontentloaded' }); // Increased timeout to 90 seconds
         console.log(`Scan ${scanId}: Navigated to ${page.url()}`);
-        await page.waitForSelector('input[name="username"], input[name="email"], input[name="phone"]', { timeout: 60000 }); // Wait for username/email field to be visible
 
-        // Attempt to click a login button if it exists, to handle multi-step logins
-        const loginButtonSelectors = [
-            'button:has-text("Login")',
-            'button:has-text("Sign In")',
-            'a:has-text("Login")',
-            'a:has-text("Sign In")',
-            'input[type="submit"][value="Login"]',
-            'input[type="submit"][value="Sign In"]',
-            '#loginButton', // Common ID
-            '#signInButton'  // Common ID
-        ];
+        // Check if the current page is already a login page
+        let onLoginPage = await isLoginPage(page, scanId);
 
-        let loginButtonClicked = false;
-        for (const selector of loginButtonSelectors) {
-            try {
-                const button = await page.locator(selector).first();
-                if (await button.isVisible()) {
-                    console.log(`Scan ${scanId}: Clicking login button with selector: ${selector}`);
-                    await button.click();
-                    await page.waitForLoadState('networkidle'); // Wait for navigation after click
-                    loginButtonClicked = true;
-                    break; // Exit loop after clicking the first visible button
+        // If not on a login page, try to find and click a login button
+        if (!onLoginPage) {
+            console.log(`Scan ${scanId}: Attempting to find and click a login/sign-in/join button.`);
+            const buttonClicked = await findAndClickLoginButton(page, scanId);
+
+            if (buttonClicked) {
+                // After clicking, re-check if we are now on a login page
+                onLoginPage = await isLoginPage(page, scanId);
+                if (!onLoginPage) {
+                    console.error(`Scan ${scanId}: After clicking a button, still not on a recognizable login page. Skipping scan for ${targetUrl}.`);
+                    await browser.close();
+                    activeScans.delete(scanId);
+                    return res.status(400).json({ error: 'Could not navigate to a recognizable login page.', scanId });
                 }
-            } catch (e) {
-                console.log(`Scan ${scanId}: Login button selector "${selector}" not found or not visible.`);
-                // Selector not found or not visible, continue to next
+            } else {
+                console.error(`Scan ${scanId}: No login/sign-in/join button found or clicked. Skipping scan for ${targetUrl}.`);
+                await browser.close();
+                activeScans.delete(scanId);
+                return res.status(400).json({ error: 'No login/sign-in/join button found to navigate to login page.', scanId });
             }
         }
-        if (!loginButtonClicked) {
-            console.log(`Scan ${scanId}: No specific login button was clicked, proceeding with form filling.`);
-        }
+
+        // Now that we are (hopefully) on a login page, wait for the login fields
+        console.log(`Scan ${scanId}: On a login page. Waiting for username/email field...`);
+        await page.waitForSelector('input[name="username"], input[name="email"], input[name="phone"]', { timeout: 60000 });
+        console.log(`Scan ${scanId}: Username/email field found.`);
 
         const results = [];
         const initialUrl = page.url(); // Capture the initial URL of the login page
