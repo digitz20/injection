@@ -316,6 +316,9 @@ app.post('/scan', async (req, res) => {
                 success = false; // Explicitly set to false if a failure message is found
                 console.log(`Scan ${scanId}: Login failed due to explicit failure message.`);
             } else {
+                // Add a small wait to ensure all elements are rendered before checking visibility
+                await page.waitForTimeout(2000); // Wait for 2 seconds
+
                 // Check for common indicators of a successful login only if no failure message was found
                 const myAccountLinkPresent = await page.locator('#flyout a:has-text("My Account")').isVisible();
                 const welcomeMessagePresent = await page.locator('text=Welcome,').isVisible();
