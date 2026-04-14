@@ -212,7 +212,7 @@
                 abortController.abort();
                 console.log("Attempting to abort fetch request.");
                 // Call backend stop-scan endpoint
-        fetch('/stop-scan', {
+        fetch('https://injection-lhpe.onrender.com/stop-scan', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
