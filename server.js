@@ -323,6 +323,25 @@ app.post('/scan', async (req, res) => {
                 const loginFormElementsStillVisible = await page.locator('input[name="username"], input[name="email"], input[name="phone"], form[action*="login"], form[action*="signin"], button:has-text("Login"), button:has-text("Sign In"), h1:has-text("Login"), h2:has-text("Login"), h3:has-text("Login"), h1:has-text("Sign In"), h2:has-text("Sign In"), h3:has-text("Sign In")').isVisible();
                 const loginFormElementsNotVisible = !loginFormElementsStillVisible;
 
+                const screenshotPathDebug = `screenshot_debug_${Date.now()}.png`;
+                await page.screenshot({ path: screenshotPathDebug });
+                console.log(`Scan ${scanId}: Debug screenshot saved to ${screenshotPathDebug}`);
+
+                const pageContentSnippet = await page.evaluate(() => {
+                    const body = document.querySelector('body');
+                    if (body) {
+                        // Attempt to get content around potential login forms
+                        const loginForm = document.querySelector('form[action*="login"], form[action*="signin"]');
+                        if (loginForm) {
+                            return loginForm.outerHTML.substring(0, 1000); // First 1000 chars of form
+                        }
+                        // Fallback to a general area if no specific form found
+                        return body.innerHTML.substring(0, 2000); // First 2000 chars of body
+                    }
+                    return 'Could not retrieve page content.';
+                });
+                console.log(`Scan ${scanId}: Page content snippet (first 2000 chars or login form): ${pageContentSnippet}`);
+
                 console.log(`Scan ${scanId}: Debugging login success conditions:`);
                 console.log(`Scan ${scanId}:   myAccountLinkPresent: ${myAccountLinkPresent}`);
                 console.log(`Scan ${scanId}:   welcomeMessagePresent: ${welcomeMessagePresent}`);
