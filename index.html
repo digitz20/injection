@@ -114,6 +114,7 @@
     <script>
         let abortController;
         let isScanning = false;
+        let currentScanId = null; // To store the ID of the current scan
 
         async function startScan() {
             if (isScanning) {
@@ -159,6 +160,10 @@
                 console.log('Data received from backend:', data);
                 console.log('Successful login data from backend:', data.successfulLogin);
 
+                if (data.scanId) {
+                    currentScanId = data.scanId; // Store the scan ID from the backend
+                }
+
                 loadingDiv.style.display = 'none'; // Hide loading message
 
                 if (response.ok) {
@@ -198,6 +203,7 @@
                 isScanning = false;
                 startScanButton.disabled = false;
                 stopScanButton.disabled = true;
+                currentScanId = null; // Clear the scan ID
             }
         }
 
@@ -205,9 +211,20 @@
             if (isScanning && abortController) {
                 abortController.abort();
                 console.log("Attempting to abort fetch request.");
-                // The finally block in startScan will handle resetting UI elements
-            }
-        }
+                // Call backend stop-scan endpoint
+        fetch('/stop-scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ scanId: currentScanId })
+        })
+        .then(response => response.json())
+        .then(data => console.log('Backend stop response:', data))
+        .catch(error => console.error('Error stopping backend scan:', error));
+        // The finally block in startScan will handle resetting UI elements
+    }
+}
     </script>
 </body>
 </html>
