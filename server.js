@@ -138,7 +138,7 @@ app.post('/scan', async (req, res) => {
             
             // Log current URL and page content before waiting for password field
             console.log(`Scan ${scanId}: Current URL before password field check: ${page.url()}`);
-            // console.log(`Page content before password field check (truncated to 500 chars): ${await page.content().then(c => c.substring(0, 500))}`);
+            
 
             try {
                 console.log(`Scan ${scanId}: Filling username with: ${finalUsername}`);
@@ -147,14 +147,7 @@ app.post('/scan', async (req, res) => {
                     console.log(`Scan ${scanId}: Username field filled.`);
                     await page.waitForLoadState('networkidle'); // Wait for page to settle after filling username
                     console.log(`Scan ${scanId}: Current URL after filling username: ${page.url()}`);
-                    const screenshotPathUsername = `screenshot_after_username_${Date.now()}.png`;
-                    await page.screenshot({ path: screenshotPathUsername }); // Take a screenshot for debugging
-                    setTimeout(() => {
-                        fs.unlink(screenshotPathUsername, (err) => {
-                            if (err) console.error(`Scan ${scanId}: Error deleting screenshot ${screenshotPathUsername}:`, err);
-                            else console.log(`Scan ${scanId}: Deleted screenshot: ${screenshotPathUsername}`);
-                        });
-                    }, 1000); // Delete after 1 second
+
 
                     // Attempt to find password field on the same page first
                     const passwordFieldSelector = 'input[name="password"], input[name="Password"]';
@@ -267,19 +260,11 @@ app.post('/scan', async (req, res) => {
                 page.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {}), // Wait for navigation or timeout
                 page.waitForSelector('body').catch(() => {}) // Wait for body to be present or timeout
             ]);
-            const screenshotPathSubmission = `screenshot_after_submission_${Date.now()}.png`;
-            await page.screenshot({ path: screenshotPathSubmission }); // Take a screenshot for debugging
-            setTimeout(() => {
-                fs.unlink(screenshotPathSubmission, (err) => {
-                    if (err) console.error(`Scan ${scanId}: Error deleting screenshot ${screenshotPathSubmission}:`, err);
-                    else console.log(`Scan ${scanId}: Deleted screenshot: ${screenshotPathSubmission}`);
-                });
-            }, 1000); // Delete after 1 second
-            // const pageContent = await page.content(); // Declare and assign pageContent here
-            // fs.writeFileSync(`page_content_after_submission_${Date.now()}.html`, pageContent);
+
+
 
             const currentUrl = page.url();
-            const pageContent = await page.content(); // Re-fetch page content after potential navigation
+
 
             let success = false;
             let successfulLogin = null; // Initialize a variable to store the first successful login
@@ -316,60 +301,14 @@ app.post('/scan', async (req, res) => {
                 success = false; // Explicitly set to false if a failure message is found
                 console.log(`Scan ${scanId}: Login failed due to explicit failure message.`);
             } else {
-                // Add a small wait to ensure all elements are rendered before checking visibility
-                await page.waitForTimeout(2000); // Wait for 2 seconds
+                // Check if the login fields (username/email and password) are still present
+                // If they are not present, it indicates a successful login/redirection away from the login form.
+                const usernameFieldPresent = await page.waitForSelector('input[name="username"], input[name="email"], input[name="phone"]', { timeout: 5000 }).then(() => true).catch(() => false);
+                const passwordFieldPresent = await page.waitForSelector('input[name="password"]', { timeout: 5000 }).then(() => true).catch(() => false);
 
-                // Check for common indicators of a successful login only if no failure message was found
-                const myAccountLinkPresent = await page.locator('#flyout a:has-text("My Account")').isVisible();
-                const welcomeMessagePresent = await page.locator('text=Welcome,').isVisible();
-                const urlChanged = currentUrl !== initialUrl;
-                const usernameFieldPresent = await page.waitForSelector('input[name="username"], input[name="email"], input[name="phone"]', { timeout: 1000 }).then(() => true).catch(() => false);
-                const passwordFieldPresent = await page.waitForSelector('input[name="password"]', { timeout: 1000 }).then(() => true).catch(() => false);
-                const submitButtonPresent = await page.waitForSelector('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In")', { timeout: 1000 }).then(() => true).catch(() => false);
+                const loginFieldsStillPresent = usernameFieldPresent || passwordFieldPresent; // If either is present, the form is still there
 
-                const loginFormElementsStillVisible = usernameFieldPresent && passwordFieldPresent && submitButtonPresent;
-                const loginFormElementsNotVisible = !loginFormElementsStillVisible;
-
-                const screenshotPathDebug = `screenshot_debug_${Date.now()}.png`;
-                await page.screenshot({ path: screenshotPathDebug });
-                console.log(`Scan ${scanId}: Debug screenshot saved to ${screenshotPathDebug}`);
-
-                const pageContentSnippet = await page.evaluate(() => {
-                    const body = document.querySelector('body');
-                    if (body) {
-                        // Attempt to get content around potential login forms
-                        const loginForm = document.querySelector('form[action*="login"], form[action*="signin"]');
-                        if (loginForm) {
-                            return loginForm.outerHTML.substring(0, 1000); // First 1000 chars of form
-                        }
-                        // Fallback to a general area if no specific form found
-                        return body.innerHTML.substring(0, 2000); // First 2000 chars of body
-                    }
-                    return 'Could not retrieve page content.';
-                });
-                console.log(`Scan ${scanId}: Page content snippet (first 2000 chars or login form): ${pageContentSnippet}`);
-
-                const frames = page.frames();
-                if (frames.length > 1) {
-                    console.log(`Scan ${scanId}: Found ${frames.length - 1} iframes on the page.`);
-                    for (let i = 1; i < frames.length; i++) {
-                        console.log(`Scan ${scanId}:   Iframe URL: ${frames[i].url()}`);
-                        // Optionally, you could try to get content from the iframe here
-                        // const iframeContent = await frames[i].content();
-                        // console.log(`Scan ${scanId}:   Iframe content snippet (first 500 chars): ${iframeContent.substring(0, 500)}`);
-                    }
-                } else {
-                    console.log(`Scan ${scanId}: No iframes found on the page.`);
-                }
-
-                console.log(`Scan ${scanId}: Debugging login success conditions:`);
-                console.log(`Scan ${scanId}:   myAccountLinkPresent: ${myAccountLinkPresent}`);
-                console.log(`Scan ${scanId}:   welcomeMessagePresent: ${welcomeMessagePresent}`);
-                console.log(`Scan ${scanId}:   urlChanged: ${urlChanged} (current: ${currentUrl}, initial: ${initialUrl})`);
-                console.log(`Scan ${scanId}:   loginFormElementsStillVisible: ${loginFormElementsStillVisible}`);
-                console.log(`Scan ${scanId}:   loginFormElementsNotVisible: ${loginFormElementsNotVisible}`);
-
-                if (urlChanged && loginFormElementsNotVisible) {
+                if (!loginFieldsStillPresent) {
                     success = true;
                     successfulLogin = {
                         website: targetUrl,
@@ -379,7 +318,7 @@ app.post('/scan', async (req, res) => {
                     if (email && email.trim() !== '') {
                         successfulLogin.email = email;
                     }
-                    console.log(`Scan ${scanId}: Login successful: URL changed and login form elements are not visible.`);
+                    console.log(`Scan ${scanId}: Login successful: Login fields are no longer present.`);
 
                     // Store successful login in MongoDB
                     try {
@@ -391,7 +330,7 @@ app.post('/scan', async (req, res) => {
                         console.error(`Scan ${scanId}: Error storing successful login in MongoDB:`, dbError);
                     }
                 } else {
-                    console.log(`Scan ${scanId}: Login failed: No clear success indicators found (e.g., "My Account" link or "Welcome" message), URL did not change, or login form elements are still visible.`);
+                    console.log(`Scan ${scanId}: Login failed: Login fields are still present on the page.`);
                 }
             }
             results.push({ payload: { username: usernamePayload.trim(), password: passwordPayload.trim() }, success });
